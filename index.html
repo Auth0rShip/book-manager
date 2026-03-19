@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+
+<!-- Header -->
+<header class="bg-indigo-700 text-white px-6 py-4 shadow">
+  <div class="max-w-6xl mx-auto flex items-center justify-between">
+    <h1 class="text-xl font-bold tracking-wide">📚 Book Library</h1>
+    <div class="flex gap-2">
+      <button onclick="openImportModal()"
+        class="bg-white text-indigo-700 text-sm font-semibold px-4 py-2 rounded hover:bg-indigo-50">
+        Import ISBNs
+      </button>
+      <button onclick="openAddModal()"
+        class="bg-indigo-500 text-white text-sm font-semibold px-4 py-2 rounded hover:bg-indigo-400">
+        + Add
+      </button>
+      <button onclick="shutdownServer()"
+        class="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded hover:bg-red-500"
+        title="Shut down the server">
+        Shutdown
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Filter Bar -->
+<div class="max-w-6xl mx-auto px-6 py-4">
+  <div class="flex flex-wrap gap-3 items-center bg-white rounded-lg shadow-sm p-4">
+    <input id="search" type="text" placeholder="Search by title or ISBN..."
+      onkeydown="if(event.key==='Enter')fetchBooks()"
+      class="border rounded px-3 py-2 text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+    <select id="filterGenre"
+      class="border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      <option value="">All Categories</option>
+    </select>
+    <select id="filterStatus"
+      class="border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      <option value="">Read / Unread</option>
+      <option value="read">Read</option>
+      <option value="unread">Unread</option>
+    </select>
+    <button onclick="fetchBooks()"
+      class="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded hover:bg-indigo-500">Search</button>
+    <span id="bookCount" class="text-sm text-gray-500 ml-auto"></span>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="max-w-6xl mx-auto px-6 pb-10">
+  <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-100 text-gray-600 text-left">
+        <tr>
+          <th class="px-4 py-3 font-semibold">Title</th>
+          <th class="px-4 py-3 font-semibold w-36">ISBN</th>
+          <th class="px-4 py-3 font-semibold w-24">Status</th>
+          <th class="px-4 py-3 font-semibold w-20">Priority</th>
+          <th class="px-4 py-3 font-semibold w-28">Category</th>
+          <th class="px-4 py-3 font-semibold w-24">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="bookTable" class="divide-y divide-gray-100">
+        <tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Book Modal -->
+<div id="addModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+    <h2 class="text-lg font-bold mb-4">📖 Add a Book</h2>
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">ISBN <span class="text-red-500">*</span></label>
+        <input id="addIsbn" type="text" placeholder="9784873119038"
+          class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Title (leave blank to auto-fetch)</label>
+        <input id="addTitle" type="text" placeholder="Auto-fetched if left blank"
+          class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      </div>
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <input id="addGenre" type="text" placeholder="Programming"
+            class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+        <div class="w-28">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+          <select id="addPriority"
+            class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="1">1 (High)</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5 (Low)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <p id="addError" class="text-red-500 text-sm mt-2 hidden"></p>
+    <div class="flex gap-3 mt-5">
+      <button onclick="submitAdd()"
+        class="flex-1 bg-indigo-600 text-white py-2 rounded font-semibold hover:bg-indigo-500">Add</button>
+      <button onclick="closeModal('addModal')"
+        class="flex-1 border py-2 rounded font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Book Modal -->
+<div id="editModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+    <h2 class="text-lg font-bold mb-4">✏️ Edit Book</h2>
+    <input id="editIsbn" type="hidden">
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+        <input id="editTitle" type="text"
+          class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+        <select id="editStatus"
+          class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+          <option value="unread">Unread</option>
+          <option value="read">Read</option>
+        </select>
+      </div>
+      <div class="flex gap-3">
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <input id="editGenre" type="text"
+            class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+        <div class="w-28">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+          <select id="editPriority"
+            class="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="1">1 (High)</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5 (Low)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-5">
+      <button onclick="submitEdit()"
+        class="flex-1 bg-indigo-600 text-white py-2 rounded font-semibold hover:bg-indigo-500">Save</button>
+      <button onclick="closeModal('editModal')"
+        class="flex-1 border py-2 rounded font-semibold text-gray-600 hover:bg-gray-50">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ISBN Bulk Import Modal -->
+<div id="importModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+    <h2 class="text-lg font-bold mb-4">📥 Bulk Import ISBNs</h2>
+    <p class="text-sm text-gray-500 mb-2">Enter ISBNs separated by newlines</p>
+    <textarea id="importText" rows="8" placeholder="9784873119038&#10;9784873118963&#10;9784621300527"
+      class="w-full border rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+    <p id="importResult" class="text-sm mt-2 text-gray-600 hidden"></p>
+    <div class="flex gap-3 mt-4">
+      <button onclick="submitImport()"
+        class="flex-1 bg-indigo-600 text-white py-2 rounded font-semibold hover:bg-indigo-500">Import</button>
+      <button onclick="closeModal('importModal')"
+        class="flex-1 border py-2 rounded font-semibold text-gray-600 hover:bg-gray-50">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shutdown Confirmation Modal -->
+<div id="shutdownModal" class="hidden fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+  <div class="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 text-center">
+    <div class="text-4xl mb-3">⚠️</div>
+    <h2 class="text-lg font-bold mb-2">Shut Down Server</h2>
+    <p class="text-sm text-gray-600 mb-5">
+      This will stop the server process and the application will become unavailable.
+      Are you sure?
+    </p>
+    <div class="flex gap-3">
+      <button onclick="confirmShutdown()"
+        class="flex-1 bg-red-600 text-white py-2 rounded font-semibold hover:bg-red-500">Shut Down</button>
+      <button onclick="closeModal('shutdownModal')"
+        class="flex-1 border py-2 rounded font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// API Calls — RESTful endpoints
+//   GET    /api/books          → List all books
+//   POST   /api/books          → Add a book
+//   PUT    /api/books/:isbn    → Update a book
+//   DELETE /api/books/:isbn    → Delete a book
+//   GET    /api/genres         → List all genres
+//   POST   /api/import         → Bulk import by ISBN
+//   POST   /api/shutdown       → Gracefully shut down the server
+// ============================================================
+const API = '/api';
+
+// In-memory cache of book data (used by the edit modal)
+let booksCache = [];
+
+async function fetchBooks() {
+  const q      = document.getElementById('search').value;
+  const genre  = document.getElementById('filterGenre').value;
+  const status = document.getElementById('filterStatus').value;
+  const params = new URLSearchParams({ q, genre, status });
+  const res    = await fetch(`${API}/books?${params}`);
+  const books  = await res.json();
+  booksCache = books;
+  renderTable(books);
+  document.getElementById('bookCount').textContent = `${books.length} book(s)`;
+}
+
+async function fetchGenres() {
+  const res    = await fetch(`${API}/genres`);
+  const genres = await res.json();
+  const sel    = document.getElementById('filterGenre');
+  while (sel.options.length > 1) sel.remove(1);
+  genres.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g; opt.textContent = g;
+    sel.appendChild(opt);
+  });
+}
+
+// ============================================================
+// Table Rendering
+//
+// Improvement: Replaced the old approach of embedding JSON.stringify
+// inside onclick handlers. Now uses data-isbn attributes with event
+// delegation for safe handling, even when titles contain quotes or
+// special characters.
+// ============================================================
+function renderTable(books) {
+  const tbody = document.getElementById('bookTable');
+  if (books.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-400">No matching books found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = books.map(b => `
+    <tr class="hover:bg-gray-50">
+      <td class="px-4 py-3 font-medium text-gray-800">${esc(b.title)}</td>
+      <td class="px-4 py-3 text-gray-500 font-mono text-xs">${esc(b.isbn)}</td>
+      <td class="px-4 py-3">
+        <span class="px-2 py-1 rounded-full text-xs font-semibold ${b.read_status === 'read'
+          ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">
+          ${b.read_status === 'read' ? 'Read' : 'Unread'}
+        </span>
+      </td>
+      <td class="px-4 py-3 text-center text-gray-700">${'★'.repeat(b.priority)}${'☆'.repeat(5 - b.priority)}</td>
+      <td class="px-4 py-3 text-gray-600">${esc(b.genre)}</td>
+      <td class="px-4 py-3">
+        <div class="flex gap-2">
+          <button data-action="edit" data-isbn="${esc(b.isbn)}"
+            class="text-indigo-600 hover:text-indigo-800 text-xs font-semibold">Edit</button>
+          <button data-action="delete" data-isbn="${esc(b.isbn)}"
+            class="text-red-500 hover:text-red-700 text-xs font-semibold">Delete</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+// Event delegation: Handle edit/delete button clicks within the table
+document.getElementById('bookTable').addEventListener('click', function(e) {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  const isbn   = btn.dataset.isbn;
+  if (action === 'edit') {
+    const book = booksCache.find(b => b.isbn === isbn);
+    if (book) openEditModal(book);
+  } else if (action === 'delete') {
+    deleteBook(isbn);
+  }
+});
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ============================================================
+// Add Book
+// ============================================================
+function openAddModal() {
+  ['addIsbn','addTitle','addGenre'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('addPriority').value = '3';
+  document.getElementById('addError').classList.add('hidden');
+  document.getElementById('addModal').classList.remove('hidden');
+}
+
+async function submitAdd() {
+  const isbn     = document.getElementById('addIsbn').value.trim();
+  const title    = document.getElementById('addTitle').value.trim();
+  const genre    = document.getElementById('addGenre').value.trim() || 'Uncategorized';
+  const priority = parseInt(document.getElementById('addPriority').value);
+  const errEl    = document.getElementById('addError');
+
+  const res  = await fetch(`${API}/books`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isbn, title, genre, priority })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    errEl.textContent = data.error;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  closeModal('addModal');
+  await Promise.all([fetchBooks(), fetchGenres()]);
+}
+
+// ============================================================
+// Edit Book — RESTful: PUT /api/books/:isbn
+// ============================================================
+function openEditModal(book) {
+  document.getElementById('editIsbn').value     = book.isbn;
+  document.getElementById('editTitle').value    = book.title;
+  document.getElementById('editStatus').value   = book.read_status;
+  document.getElementById('editGenre').value    = book.genre;
+  document.getElementById('editPriority').value = String(book.priority);
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+async function submitEdit() {
+  const isbn        = document.getElementById('editIsbn').value;
+  const title       = document.getElementById('editTitle').value.trim();
+  const read_status = document.getElementById('editStatus').value;
+  const genre       = document.getElementById('editGenre').value.trim();
+  const priority    = parseInt(document.getElementById('editPriority').value);
+
+  await fetch(`${API}/books/${encodeURIComponent(isbn)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, read_status, genre, priority })
+  });
+  closeModal('editModal');
+  await Promise.all([fetchBooks(), fetchGenres()]);
+}
+
+// ============================================================
+// Delete Book — RESTful: DELETE /api/books/:isbn
+// ============================================================
+async function deleteBook(isbn) {
+  if (!confirm(`Delete "${isbn}"?`)) return;
+  await fetch(`${API}/books/${encodeURIComponent(isbn)}`, { method: 'DELETE' });
+  await fetchBooks();
+}
+
+// ============================================================
+// ISBN Bulk Import
+// ============================================================
+function openImportModal() {
+  document.getElementById('importText').value = '';
+  document.getElementById('importResult').classList.add('hidden');
+  document.getElementById('importModal').classList.remove('hidden');
+}
+
+async function submitImport() {
+  const text  = document.getElementById('importText').value;
+  const isbns = text.split(/[\r\n]+/).map(s => s.trim()).filter(s => s.length > 0);
+  const resultEl = document.getElementById('importResult');
+
+  resultEl.textContent = 'Fetching... This may take a moment.';
+  resultEl.classList.remove('hidden');
+
+  const res  = await fetch(`${API}/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ isbns })
+  });
+  const data = await res.json();
+  resultEl.textContent = `Done: ${data.added} added, ${data.skipped} skipped`;
+  await Promise.all([fetchBooks(), fetchGenres()]);
+}
+
+// ============================================================
+// Server Shutdown
+// ============================================================
+function shutdownServer() {
+  document.getElementById('shutdownModal').classList.remove('hidden');
+}
+
+async function confirmShutdown() {
+  closeModal('shutdownModal');
+  try {
+    await fetch(`${API}/shutdown`, { method: 'POST' });
+  } catch (e) {
+    // Connection may drop before the response arrives — that's expected
+  }
+  document.body.innerHTML = `
+    <div class="flex items-center justify-center min-h-screen bg-gray-100">
+      <div class="text-center">
+        <div class="text-5xl mb-4">👋</div>
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Server Shut Down</h1>
+        <p class="text-gray-500">The server has been stopped. You can close this tab.</p>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// Utilities
+// ============================================================
+function closeModal(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+// Initial load
+fetchBooks();
+fetchGenres();
+</script>
+</body>
+</html>
